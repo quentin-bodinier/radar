@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Radar — {{HEADER_DATE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --brand-blue: #4d65ff;
+  --brand-blue-glow: rgba(77, 101, 255, 0.18);
+  --brand-orange: #FF8B50;
+  --red: #f85149;
+  --yellow: #d29922;
+  --green: #3fb950;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 32px 48px; }
+
+header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+}
+.header-left h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.header-left .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+.header-right { display: flex; gap: 10px; align-items: center; }
+.header-right a, .header-right button {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 500;
+  text-decoration: none; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.header-right a:hover, .header-right button:hover { background: var(--surface2); border-color: var(--brand-blue); color: var(--brand-blue); }
+.header-right button#refresh-btn:hover { color: var(--brand-orange); border-color: var(--brand-orange); }
+
+.progress-wrap { margin-bottom: 20px; }
+.progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.progress-bar-outer { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.progress-bar-inner { height: 100%; background: var(--brand-blue); width: 0%; transition: width 0.3s; }
+
+.focus-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin-right: 4px; padding-top: 4px; }
+.focus-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 500;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.focus-chip:hover { background: var(--bg); }
+.focus-chip.urgent { border-color: var(--red); }
+.focus-chip.warning { border-color: var(--brand-orange); }
+.focus-chip.user-added {
+  background: linear-gradient(180deg, var(--brand-blue-glow), rgba(77,101,255,0.04));
+  border-color: var(--brand-blue);
+  color: var(--text);
+}
+.focus-chip.user-added::before { content: "★"; color: var(--brand-blue); font-size: 11px; }
+
+.done-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; min-height: 0; }
+.done-chip { font-size: 11px; color: var(--text-muted); background: var(--surface); padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); text-decoration: line-through; }
+
+.grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
+.column { display: flex; flex-direction: column; gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: var(--text-muted); }
+.badge { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+
+.timeline { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.now-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--brand-orange); opacity: 0.6; pointer-events: none; }
+.now-line::before { content: ""; position: absolute; left: 46px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--brand-orange); box-shadow: 0 0 0 3px rgba(255,139,80,0.2); }
+.event {
+  display: flex; gap: 12px; padding: 8px 6px; border-radius: 6px; align-items: flex-start;
+  transition: background 0.15s;
+}
+.event:hover { background: var(--surface2); }
+.event-time { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 52px; padding-top: 2px; font-weight: 500; }
+.event-bar { width: 3px; align-self: stretch; background: var(--brand-blue); border-radius: 2px; min-height: 22px; flex-shrink: 0; }
+.event.tentative .event-bar { background: var(--yellow); }
+.event.declined .event-bar { background: var(--red); opacity: 0.4; }
+.event.past .event-bar { background: var(--text-muted); opacity: 0.5; }
+.event.personal .event-bar { background: var(--text-muted); }
+.event.async .event-bar { background: var(--brand-orange); opacity: 0.7; }
+.event-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.event-title { font-size: 13px; font-weight: 500; color: var(--text); }
+.event.declined .event-title, .event.past .event-title { color: var(--text-muted); text-decoration: line-through; }
+.event-sub { font-size: 11px; color: var(--text-muted); }
+
+.item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 6px; transition: background 0.15s; }
+.item:hover { background: var(--surface2); }
+.item-check { margin-top: 3px; flex-shrink: 0; }
+.item-check input { accent-color: var(--brand-blue); cursor: pointer; }
+.item-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.item-title { font-size: 13px; font-weight: 500; line-height: 1.4; }
+.item-sub { font-size: 11px; color: var(--text-muted); }
+.item.done .item-title { text-decoration: line-through; color: var(--text-muted); }
+.item-priority { font-size: 12px; flex-shrink: 0; margin-top: 2px; }
+
+.commit-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 6px; transition: background 0.15s; }
+.commit-item:hover { background: var(--surface2); }
+.commit-item.due-today .item-sub { color: var(--brand-orange); font-weight: 500; }
+.commit-item.done .item-title { text-decoration: line-through; color: var(--text-muted); }
+
+.carryover-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 20px;
+  font-size: 10px; font-weight: 500;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.carryover-badge.warm { color: var(--brand-orange); border-color: rgba(255,139,80,0.4); }
+.carryover-badge.hot { color: var(--red); border-color: rgba(248,81,73,0.4); }
+.new-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 20px;
+  font-size: 10px; font-weight: 500;
+  color: var(--brand-blue);
+  border: 1px solid rgba(77,101,255,0.4);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.user-focus-card {
+  background: var(--surface);
+  border: 1px solid var(--brand-blue);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background-image: linear-gradient(180deg, var(--brand-blue-glow), transparent 60%);
+}
+.user-focus-card .card-title { color: var(--brand-blue); }
+
+.tomorrow-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; border-left: 3px solid var(--green); }
+.tomorrow-card .card-title { color: var(--green); }
+.empty { color: var(--text-muted); font-size: 12px; font-style: italic; padding: 8px 6px; }
+
+.item-source-link, .event-link {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+  opacity: 0.5;
+  margin-left: 6px;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.item-source-link:hover, .event-link:hover {
+  opacity: 1;
+  color: var(--brand-blue);
+}
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: 1fr; }
+  .container { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-left">
+      <h1>{{HEADER_DATE}}</h1>
+      <div class="meta">{{HEADER_META}}</div>
+    </div>
+    <div class="header-right">
+      <a href="team.html">👥 Team</a>
+      <button id="refresh-btn" onclick="location.reload()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Day progress</span>
+      <span id="progress-text">0 of 0 done</span>
+    </div>
+    <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar"></div></div>
+  </div>
+
+  <div class="focus-strip">
+    <span class="focus-label">Focus →</span>
+    {{FOCUS_CHIPS}}
+  </div>
+
+  <div class="done-strip" id="done-strip"></div>
+
+  {{USER_FOCUS_CARD_OPTIONAL}}
+
+  <div class="grid">
+    <div class="column">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Today's Calendar</div>
+          <div class="badge">{{CALENDAR_COUNT}} events</div>
+        </div>
+        <div class="timeline" id="timeline">
+          {{CALENDAR_EVENTS}}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Open commitments</div>
+          <div class="badge">{{COMMITMENTS_COUNT}} open</div>
+        </div>
+        {{COMMITMENT_ITEMS}}
+      </div>
+
+    </div>
+
+    <div class="column">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Slack — awaiting reply</div>
+          <div class="badge">{{SLACK_BADGE}}</div>
+        </div>
+        {{SLACK_ITEMS}}
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Gmail — action items</div>
+          <div class="badge">{{GMAIL_COUNT}} open</div>
+        </div>
+        {{GMAIL_ITEMS}}
+      </div>
+
+      <div class="tomorrow-card">
+        <div class="card-header">
+          <div class="card-title">Tomorrow — {{TOMORROW_DATE}}</div>
+          <div class="badge">{{TOMORROW_BADGE}}</div>
+        </div>
+        {{TOMORROW_ITEMS}}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'radar-today-{{ISO_DATE}}';
+
+function loadState() {
+  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveState(state) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function handleCheck(el) {
+  const key = el.dataset.key;
+  const state = loadState();
+  state[key] = el.checked;
+  saveState(state);
+  const parent = el.closest('.item, .commit-item');
+  if (parent) parent.classList.toggle('done', el.checked);
+  updateDoneStrip();
+  updateProgress();
+}
+
+function restoreState() {
+  const state = loadState();
+  document.querySelectorAll('input[type="checkbox"][data-key]').forEach(el => {
+    const key = el.dataset.key;
+    if (state[key]) {
+      el.checked = true;
+      const parent = el.closest('.item, .commit-item');
+      if (parent) parent.classList.add('done');
+    }
+  });
+}
+
+function scrollToItem(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.style.transition = 'background 0.3s';
+    el.style.background = 'var(--surface2)';
+    setTimeout(() => { el.style.background = ''; }, 1400);
+  }
+}
+
+function updateDoneStrip() {
+  const strip = document.getElementById('done-strip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  document.querySelectorAll('.item.done, .commit-item.done').forEach(el => {
+    const title = el.querySelector('.item-title');
+    if (!title) return;
+    const chip = document.createElement('span');
+    chip.className = 'done-chip';
+    const t = title.textContent.trim();
+    chip.textContent = t.length > 60 ? t.slice(0, 60) + '…' : t;
+    strip.appendChild(chip);
+  });
+}
+
+function updateProgress() {
+  const boxes = document.querySelectorAll('input[type="checkbox"][data-key]');
+  const done = document.querySelectorAll('input[type="checkbox"][data-key]:checked');
+  const total = boxes.length;
+  const count = done.length;
+  const pct = total ? (count / total) * 100 : 0;
+  const bar = document.getElementById('progress-bar');
+  const txt = document.getElementById('progress-text');
+  if (bar) bar.style.width = pct + '%';
+  if (txt) txt.textContent = count + ' of ' + total + ' done';
+}
+
+function placeNowLine() {
+  const timeline = document.getElementById('timeline');
+  if (!timeline) return;
+  const events = Array.from(timeline.querySelectorAll('.event'));
+  if (!events.length) return;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  let insertBefore = null;
+  for (const ev of events) {
+    const t = ev.getAttribute('data-time');
+    if (!t) continue;
+    const [h, m] = t.split(':').map(Number);
+    const eventMin = h * 60 + m;
+    if (eventMin > nowMin) { insertBefore = ev; break; }
+  }
+  const line = document.createElement('div');
+  line.className = 'now-line';
+  if (insertBefore) {
+    const rect = insertBefore.getBoundingClientRect();
+    const tlRect = timeline.getBoundingClientRect();
+    line.style.top = (rect.top - tlRect.top - 4) + 'px';
+  } else {
+    line.style.bottom = '-4px';
+  }
+  timeline.appendChild(line);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  restoreState();
+  updateDoneStrip();
+  updateProgress();
+  placeNowLine();
+});
+</script>
+</body>
+</html>

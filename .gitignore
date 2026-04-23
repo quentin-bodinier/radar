@@ -1,0 +1,10 @@
+# Sensitive / generated data
+today.html
+team.html
+state/
+
+# Local Claude settings
+.claude/settings.local.json
+
+# macOS
+.DS_Store
