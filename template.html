@@ -5,21 +5,27 @@
 <title>Radar — {{HEADER_DATE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --brand-blue: #4d65ff;
-  --brand-blue-glow: rgba(77, 101, 255, 0.18);
-  --brand-orange: #FF8B50;
-  --red: #f85149;
-  --yellow: #d29922;
-  --green: #3fb950;
-  --bg: #0d1117;
-  --surface: #161b22;
-  --surface2: #21262d;
-  --border: #30363d;
-  --text: #e6edf3;
-  --text-muted: #8b949e;
+  /* Inato brand — warm neutral dark theme, orange/purple as accents only */
+  --brand-primary: #ff6329;
+  --brand-primary-glow: rgba(255, 99, 41, 0.15);
+  --brand-primary-soft: rgba(255, 99, 41, 0.4);
+  --brand-accent: #b250cd;
+  --brand-accent-glow: rgba(178, 80, 205, 0.15);
+  --brand-accent-soft: rgba(178, 80, 205, 0.4);
+  --danger: #f17664;
+  --danger-soft: rgba(241, 118, 100, 0.4);
+  --warning: #ffab47;
+  --tentative: #ffc146;
+  --success: #25c354;
+  --bg: #14100f;
+  --surface: #1d1817;
+  --surface2: #272220;
+  --border: #3a3431;
+  --text: #ede7e1;
+  --text-muted: #9a9089;
 }
 * { box-sizing: border-box; }
 html, body {
@@ -37,7 +43,7 @@ header {
   display: flex; justify-content: space-between; align-items: flex-end;
   padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px;
 }
-.header-left h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.header-left h1 { font-family: 'Lora', 'Times New Roman', serif; font-size: 26px; font-weight: 500; margin: 0; letter-spacing: -0.015em; }
 .header-left .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
 .header-right { display: flex; gap: 10px; align-items: center; }
 .header-right a, .header-right button {
@@ -49,15 +55,15 @@ header {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
   font-family: inherit;
 }
-.header-right a:hover, .header-right button:hover { background: var(--surface2); border-color: var(--brand-blue); color: var(--brand-blue); }
-.header-right button#refresh-btn:hover { color: var(--brand-orange); border-color: var(--brand-orange); }
+.header-right a:hover, .header-right button:hover { background: var(--surface2); border-color: var(--brand-accent); color: var(--brand-accent); }
+.header-right button#refresh-btn:hover { color: var(--brand-primary); border-color: var(--brand-primary); }
 
 .progress-wrap { margin-bottom: 20px; }
 .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 .progress-bar-outer { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-.progress-bar-inner { height: 100%; background: var(--brand-blue); width: 0%; transition: width 0.3s; }
+.progress-bar-inner { height: 100%; background: var(--brand-accent); width: 0%; transition: width 0.3s; }
 
-.focus-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.focus-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
 .focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin-right: 4px; padding-top: 4px; }
 .focus-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -70,58 +76,58 @@ header {
   transition: background 0.15s, border-color 0.15s;
 }
 .focus-chip:hover { background: var(--bg); }
-.focus-chip.urgent { border-color: var(--red); }
-.focus-chip.warning { border-color: var(--brand-orange); }
+.focus-chip.urgent { border-color: var(--danger); }
+.focus-chip.warning { border-color: var(--warning); }
 .focus-chip.user-added {
-  background: linear-gradient(180deg, var(--brand-blue-glow), rgba(77,101,255,0.04));
-  border-color: var(--brand-blue);
+  background: linear-gradient(180deg, var(--brand-accent-glow), rgba(178,80,205,0.04));
+  border-color: var(--brand-accent);
   color: var(--text);
 }
-.focus-chip.user-added::before { content: "★"; color: var(--brand-blue); font-size: 11px; }
+.focus-chip.user-added::before { content: "★"; color: var(--brand-accent); font-size: 11px; }
 
 .done-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; min-height: 0; }
 .done-chip { font-size: 11px; color: var(--text-muted); background: var(--surface); padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); text-decoration: line-through; }
 
 .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; }
 .column { display: flex; flex-direction: column; gap: 20px; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: var(--text-muted); }
 .badge { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
 
 .timeline { display: flex; flex-direction: column; gap: 6px; position: relative; }
-.now-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--brand-orange); opacity: 0.6; pointer-events: none; }
-.now-line::before { content: ""; position: absolute; left: 46px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--brand-orange); box-shadow: 0 0 0 3px rgba(255,139,80,0.2); }
+.now-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--brand-primary); opacity: 0.6; pointer-events: none; }
+.now-line::before { content: ""; position: absolute; left: 46px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--brand-primary); box-shadow: 0 0 0 3px rgba(255,99,41,0.2); }
 .event {
-  display: flex; gap: 12px; padding: 8px 6px; border-radius: 6px; align-items: flex-start;
+  display: flex; gap: 12px; padding: 8px 6px; border-radius: 8px; align-items: flex-start;
   transition: background 0.15s;
 }
 .event:hover { background: var(--surface2); }
 .event-time { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; min-width: 52px; padding-top: 2px; font-weight: 500; }
-.event-bar { width: 3px; align-self: stretch; background: var(--brand-blue); border-radius: 2px; min-height: 22px; flex-shrink: 0; }
-.event.tentative .event-bar { background: var(--yellow); }
-.event.declined .event-bar { background: var(--red); opacity: 0.4; }
+.event-bar { width: 3px; align-self: stretch; background: var(--brand-accent); border-radius: 2px; min-height: 22px; flex-shrink: 0; }
+.event.tentative .event-bar { background: var(--tentative); }
+.event.declined .event-bar { background: var(--danger); opacity: 0.4; }
 .event.past .event-bar { background: var(--text-muted); opacity: 0.5; }
 .event.personal .event-bar { background: var(--text-muted); }
-.event.async .event-bar { background: var(--brand-orange); opacity: 0.7; }
+.event.async .event-bar { background: var(--brand-primary); opacity: 0.7; }
 .event-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .event-title { font-size: 13px; font-weight: 500; color: var(--text); }
 .event.declined .event-title, .event.past .event-title { color: var(--text-muted); text-decoration: line-through; }
 .event-sub { font-size: 11px; color: var(--text-muted); }
 
-.item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 6px; transition: background 0.15s; }
+.item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 8px; transition: background 0.15s; }
 .item:hover { background: var(--surface2); }
 .item-check { margin-top: 3px; flex-shrink: 0; }
-.item-check input { accent-color: var(--brand-blue); cursor: pointer; }
+.item-check input { accent-color: var(--brand-accent); cursor: pointer; }
 .item-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .item-title { font-size: 13px; font-weight: 500; line-height: 1.4; }
 .item-sub { font-size: 11px; color: var(--text-muted); }
 .item.done .item-title { text-decoration: line-through; color: var(--text-muted); }
 .item-priority { font-size: 12px; flex-shrink: 0; margin-top: 2px; }
 
-.commit-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 6px; transition: background 0.15s; }
+.commit-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 6px; border-radius: 8px; transition: background 0.15s; }
 .commit-item:hover { background: var(--surface2); }
-.commit-item.due-today .item-sub { color: var(--brand-orange); font-weight: 500; }
+.commit-item.due-today .item-sub { color: var(--brand-primary); font-weight: 500; }
 .commit-item.done .item-title { text-decoration: line-through; color: var(--text-muted); }
 
 .carryover-badge {
@@ -135,29 +141,93 @@ header {
   vertical-align: middle;
   white-space: nowrap;
 }
-.carryover-badge.warm { color: var(--brand-orange); border-color: rgba(255,139,80,0.4); }
-.carryover-badge.hot { color: var(--red); border-color: rgba(248,81,73,0.4); }
+.carryover-badge.warm { color: var(--brand-primary); border-color: var(--brand-primary-soft); }
+.carryover-badge.hot { color: var(--danger); border-color: var(--danger-soft); }
 .new-badge {
   display: inline-flex; align-items: center;
   padding: 1px 7px; border-radius: 20px;
   font-size: 10px; font-weight: 500;
-  color: var(--brand-blue);
-  border: 1px solid rgba(77,101,255,0.4);
+  color: var(--brand-accent);
+  border: 1px solid var(--brand-accent-soft);
   margin-left: 6px;
   vertical-align: middle;
 }
 
 .user-focus-card {
   background: var(--surface);
-  border: 1px solid var(--brand-blue);
-  border-radius: 12px;
+  border: 1px solid var(--brand-accent);
+  border-radius: 16px;
   padding: 16px 18px;
-  background-image: linear-gradient(180deg, var(--brand-blue-glow), transparent 60%);
+  margin-bottom: 20px;
+  background-image: linear-gradient(180deg, var(--brand-accent-glow), transparent 60%);
 }
-.user-focus-card .card-title { color: var(--brand-blue); }
+.user-focus-card .card-title { color: var(--brand-accent); }
+.user-focus-add-btn {
+  background: transparent; color: var(--brand-accent);
+  border: 1px solid var(--brand-accent);
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 500;
+  cursor: pointer; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.user-focus-add-btn:hover { background: var(--brand-accent-glow); }
+.user-focus-add-btn kbd {
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 0 5px; border-radius: 3px; font-size: 10px;
+  font-family: inherit; color: var(--text-muted);
+}
+.user-focus-list { display: flex; flex-direction: column; gap: 2px; }
+.user-focus-item { position: relative; }
+.user-focus-item .item-title { font-weight: 500; }
+.user-focus-empty {
+  font-size: 12px; color: var(--text-muted); padding: 8px 6px; font-style: italic;
+}
+.user-focus-empty kbd {
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 1px 6px; border-radius: 4px; font-size: 11px; font-family: inherit;
+  color: var(--text); font-style: normal;
+}
+.user-focus-delete {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 18px; padding: 0 8px; line-height: 1;
+  opacity: 0; transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0; align-self: center;
+}
+.user-focus-item:hover .user-focus-delete { opacity: 0.6; }
+.user-focus-delete:hover { opacity: 1 !important; color: var(--danger); }
 
-.tomorrow-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; border-left: 3px solid var(--green); }
-.tomorrow-card .card-title { color: var(--green); }
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: none; align-items: flex-start; justify-content: center;
+  padding-top: 140px; z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.open { display: flex; }
+.modal-panel {
+  background: var(--surface); border: 1px solid var(--brand-accent);
+  border-radius: 16px; padding: 18px 20px; width: 520px; max-width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--brand-accent); font-weight: 600; margin-bottom: 10px;
+}
+.modal-panel input {
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font-size: 14px; font-family: inherit;
+  outline: none; transition: border-color 0.15s;
+}
+.modal-panel input:focus { border-color: var(--brand-accent); }
+.modal-hint { font-size: 11px; color: var(--text-muted); margin-top: 10px; }
+.modal-hint kbd {
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 0 5px; border-radius: 3px; font-size: 10px; font-family: inherit;
+}
+
+.tomorrow-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; border-left: 3px solid var(--success); }
+.tomorrow-card .card-title { color: var(--success); }
 .empty { color: var(--text-muted); font-size: 12px; font-style: italic; padding: 8px 6px; }
 
 .item-source-link, .event-link {
@@ -171,7 +241,7 @@ header {
 }
 .item-source-link:hover, .event-link:hover {
   opacity: 1;
-  color: var(--brand-blue);
+  color: var(--brand-accent);
 }
 
 @media (max-width: 900px) {
@@ -188,7 +258,6 @@ header {
       <div class="meta">{{HEADER_META}}</div>
     </div>
     <div class="header-right">
-      <a href="team.html">👥 Team</a>
       <button id="refresh-btn" onclick="location.reload()">↻ Refresh</button>
     </div>
   </header>
@@ -201,14 +270,20 @@ header {
     <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar"></div></div>
   </div>
 
-  <div class="focus-strip">
+  <div class="focus-strip" id="focus-strip">
     <span class="focus-label">Focus →</span>
     {{FOCUS_CHIPS}}
   </div>
 
   <div class="done-strip" id="done-strip"></div>
 
-  {{USER_FOCUS_CARD_OPTIONAL}}
+  <div class="user-focus-card" id="user-focus-card">
+    <div class="card-header">
+      <div class="card-title">My focus today</div>
+      <button class="user-focus-add-btn" onclick="openUserFocusModal()" title="Press N to add">+ Add <kbd>N</kbd></button>
+    </div>
+    <div class="user-focus-list" id="user-focus-list"></div>
+  </div>
 
   <div class="grid">
     <div class="column">
@@ -263,8 +338,17 @@ header {
   </div>
 </div>
 
+<div id="user-focus-modal" class="modal-overlay" onclick="if(event.target===this)closeUserFocusModal()">
+  <div class="modal-panel">
+    <div class="modal-label">New focus task</div>
+    <input type="text" id="user-focus-input" placeholder="What do you proactively choose to focus on?" maxlength="120" autocomplete="off">
+    <div class="modal-hint"><kbd>Enter</kbd> to add · <kbd>Esc</kbd> to cancel</div>
+  </div>
+</div>
+
 <script>
 const STORAGE_KEY = 'radar-today-{{ISO_DATE}}';
+const USER_FOCUS_KEY = 'radar-user-focus-tasks';
 
 function loadState() {
   try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; }
@@ -275,6 +359,14 @@ function saveState(state) {
 
 function handleCheck(el) {
   const key = el.dataset.key;
+  if (key && key.startsWith('uf-')) {
+    toggleUserFocusTask(key, el.checked);
+    const parent = el.closest('.user-focus-item');
+    if (parent) parent.classList.toggle('done', el.checked);
+    updateDoneStrip();
+    updateProgress();
+    return;
+  }
   const state = loadState();
   state[key] = el.checked;
   saveState(state);
@@ -288,6 +380,7 @@ function restoreState() {
   const state = loadState();
   document.querySelectorAll('input[type="checkbox"][data-key]').forEach(el => {
     const key = el.dataset.key;
+    if (key && key.startsWith('uf-')) return;
     if (state[key]) {
       el.checked = true;
       const parent = el.closest('.item, .commit-item');
@@ -310,12 +403,12 @@ function updateDoneStrip() {
   const strip = document.getElementById('done-strip');
   if (!strip) return;
   strip.innerHTML = '';
-  document.querySelectorAll('.item.done, .commit-item.done').forEach(el => {
+  document.querySelectorAll('.item.done, .commit-item.done, .user-focus-item.done').forEach(el => {
     const title = el.querySelector('.item-title');
     if (!title) return;
     const chip = document.createElement('span');
     chip.className = 'done-chip';
-    const t = title.textContent.trim();
+    const t = (title.childNodes[0] ? title.childNodes[0].textContent : title.textContent).trim();
     chip.textContent = t.length > 60 ? t.slice(0, 60) + '…' : t;
     strip.appendChild(chip);
   });
@@ -360,8 +453,175 @@ function placeNowLine() {
   timeline.appendChild(line);
 }
 
+// ----- User focus tasks (press N to add) -----
+
+function loadUserFocusTasks() {
+  try {
+    const raw = localStorage.getItem(USER_FOCUS_KEY);
+    if (!raw) return { version: 1, tasks: [] };
+    const data = JSON.parse(raw);
+    if (!data.tasks) data.tasks = [];
+    return data;
+  } catch(e) { return { version: 1, tasks: [] }; }
+}
+function saveUserFocusTasks(data) {
+  try { localStorage.setItem(USER_FOCUS_KEY, JSON.stringify(data)); } catch(e) {}
+}
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function daysSince(dateStr) {
+  if (!dateStr) return 0;
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const then = new Date(y, m-1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((today - then) / 86400000);
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function addUserFocusTask(title) {
+  title = (title || '').trim();
+  if (!title) return;
+  const data = loadUserFocusTasks();
+  data.tasks.push({
+    id: 'uf-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+    title,
+    created_at: new Date().toISOString(),
+    created_date: todayISO(),
+    completed: false,
+    completed_at: null
+  });
+  saveUserFocusTasks(data);
+  renderUserFocus();
+  updateProgress();
+  updateDoneStrip();
+}
+
+function toggleUserFocusTask(id, checked) {
+  const data = loadUserFocusTasks();
+  const t = data.tasks.find(x => x.id === id);
+  if (!t) return;
+  t.completed = checked;
+  t.completed_at = checked ? new Date().toISOString() : null;
+  saveUserFocusTasks(data);
+}
+
+function deleteUserFocusTask(id) {
+  const data = loadUserFocusTasks();
+  data.tasks = data.tasks.filter(x => x.id !== id);
+  saveUserFocusTasks(data);
+  renderUserFocus();
+  updateProgress();
+  updateDoneStrip();
+}
+
+function pruneUserFocusTasks() {
+  const data = loadUserFocusTasks();
+  const today = todayISO();
+  const before = data.tasks.length;
+  data.tasks = data.tasks.filter(t => {
+    if (!t.completed) return true;
+    if (!t.completed_at) return true;
+    return t.completed_at.slice(0, 10) === today;
+  });
+  if (data.tasks.length !== before) saveUserFocusTasks(data);
+}
+
+function renderUserFocus() {
+  pruneUserFocusTasks();
+  const list = document.getElementById('user-focus-list');
+  if (!list) return;
+  const data = loadUserFocusTasks();
+  const tasks = data.tasks.slice().sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    const dc = (a.created_date || '').localeCompare(b.created_date || '');
+    if (dc !== 0) return dc;
+    return (a.created_at || '').localeCompare(b.created_at || '');
+  });
+
+  list.innerHTML = '';
+  if (tasks.length === 0) {
+    list.innerHTML = '<div class="user-focus-empty">Press <kbd>N</kbd> to add a focus task — what you <em>choose</em> to work on, not what\'s reacting to notifications.</div>';
+  } else {
+    tasks.forEach(t => {
+      const days = daysSince(t.created_date);
+      const badgeClass = days >= 3 ? 'hot' : (days >= 1 ? 'warm' : '');
+      const badge = days > 0 ? `<span class="carryover-badge ${badgeClass}">day ${days+1}</span>` : '';
+      const item = document.createElement('div');
+      item.className = 'user-focus-item item' + (t.completed ? ' done' : '');
+      item.id = t.id;
+      item.innerHTML =
+        '<div class="item-check"><input type="checkbox" data-key="' + t.id + '"' + (t.completed ? ' checked' : '') + ' onchange="handleCheck(this)"></div>' +
+        '<div class="item-body"><div class="item-title">' + escapeHtml(t.title) + badge + '</div></div>' +
+        '<button class="user-focus-delete" onclick="deleteUserFocusTask(\'' + t.id + '\')" title="Remove">×</button>';
+      list.appendChild(item);
+    });
+  }
+
+  const strip = document.getElementById('focus-strip');
+  if (strip) {
+    strip.querySelectorAll('.focus-chip.user-added').forEach(c => c.remove());
+    const label = strip.querySelector('.focus-label');
+    tasks.filter(t => !t.completed).slice(0, 6).reverse().forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'focus-chip user-added';
+      chip.onclick = () => scrollToItem(t.id);
+      const text = t.title.length > 50 ? t.title.slice(0, 50) + '…' : t.title;
+      chip.textContent = text;
+      if (label && label.nextSibling) {
+        strip.insertBefore(chip, label.nextSibling);
+      } else {
+        strip.appendChild(chip);
+      }
+    });
+  }
+}
+
+let userFocusModalOpen = false;
+function openUserFocusModal() {
+  if (userFocusModalOpen) return;
+  userFocusModalOpen = true;
+  const overlay = document.getElementById('user-focus-modal');
+  const input = document.getElementById('user-focus-input');
+  if (!overlay || !input) return;
+  overlay.classList.add('open');
+  input.value = '';
+  setTimeout(() => input.focus(), 10);
+}
+function closeUserFocusModal() {
+  userFocusModalOpen = false;
+  const overlay = document.getElementById('user-focus-modal');
+  if (overlay) overlay.classList.remove('open');
+}
+function submitUserFocus() {
+  const input = document.getElementById('user-focus-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (val) addUserFocusTask(val);
+  closeUserFocusModal();
+}
+
+document.addEventListener('keydown', (e) => {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
+  if (userFocusModalOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeUserFocusModal(); }
+    else if (e.key === 'Enter') { e.preventDefault(); submitUserFocus(); }
+    return;
+  }
+  if ((e.key === 'n' || e.key === 'N') && !inField && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    openUserFocusModal();
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   restoreState();
+  renderUserFocus();
   updateDoneStrip();
   updateProgress();
   placeNowLine();
