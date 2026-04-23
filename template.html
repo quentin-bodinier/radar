@@ -244,6 +244,25 @@ header {
   color: var(--brand-accent);
 }
 
+.event-actions {
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0; padding-top: 2px; align-self: center;
+}
+.event-join {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px;
+  background: rgba(37, 195, 84, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(37, 195, 84, 0.35);
+  font-size: 11px; font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.event-join::before { content: "▶"; font-size: 8px; }
+.event-join:hover { background: var(--success); color: var(--bg); border-color: var(--success); }
+.event.past .event-join, .event.declined .event-join { opacity: 0.45; }
+
 @media (max-width: 900px) {
   .grid { grid-template-columns: 1fr; }
   .container { padding: 16px; }
@@ -280,10 +299,16 @@ header {
   <div class="user-focus-card" id="user-focus-card">
     <div class="card-header">
       <div class="card-title">My focus today</div>
-      <button class="user-focus-add-btn" onclick="openUserFocusModal()" title="Press N to add">+ Add <kbd>N</kbd></button>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button id="fs-connect-btn" class="user-focus-add-btn" onclick="connectFocusStorage()" title="Grant write access to ~/Documents/Radar/state/" style="display:none;">⚡ Connect</button>
+        <span id="fs-status" class="user-focus-empty" style="padding:0; font-style:normal; font-size:11px;"></span>
+        <button class="user-focus-add-btn" onclick="openUserFocusModal()" title="Press N to add">+ Add <kbd>N</kbd></button>
+      </div>
     </div>
     <div class="user-focus-list" id="user-focus-list"></div>
   </div>
+
+  <div id="radar-toast" style="position:fixed; bottom:24px; right:24px; background:var(--surface); color:var(--text); border:1px solid var(--brand-accent); border-radius:10px; padding:10px 16px; font-size:12px; box-shadow:0 8px 24px rgba(0,0,0,0.4); opacity:0; transform:translateY(8px); transition:opacity 0.2s, transform 0.2s; z-index:2000; max-width:340px; pointer-events:none;"></div>
 
   <div class="grid">
     <div class="column">
@@ -349,17 +374,22 @@ header {
 <script>
 const STORAGE_KEY = 'radar-today-{{ISO_DATE}}';
 const USER_FOCUS_KEY = 'radar-user-focus-tasks';
+const RADAR_FOCUS_JSON_INITIAL = {{USER_FOCUS_JSON_INITIAL}};
+const FS_DB_NAME = 'radar-fs';
+const FS_STORE = 'handles';
+const FS_KEY = 'stateDir';
+let fsDirHandle = null;
 
 function loadState() {
-  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { return {}; }
 }
 function saveState(state) {
-  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
 }
 
 function handleCheck(el) {
   const key = el.dataset.key;
-  if (key && key.startsWith('uf-')) {
+  if (key && (key.startsWith('uf-') || key.startsWith('focus-'))) {
     toggleUserFocusTask(key, el.checked);
     const parent = el.closest('.user-focus-item');
     if (parent) parent.classList.toggle('done', el.checked);
@@ -453,6 +483,170 @@ function placeNowLine() {
   timeline.appendChild(line);
 }
 
+// ----- File System Access bridge to focus.json -----
+
+function fsOpenDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(FS_DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(FS_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function fsGetStored() {
+  try {
+    const db = await fsOpenDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(FS_STORE, 'readonly');
+      const r = tx.objectStore(FS_STORE).get(FS_KEY);
+      r.onsuccess = () => resolve(r.result || null);
+      r.onerror = () => reject(r.error);
+    });
+  } catch(e) { return null; }
+}
+async function fsStore(handle) {
+  const db = await fsOpenDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FS_STORE, 'readwrite');
+    tx.objectStore(FS_STORE).put(handle, FS_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function fsClear() {
+  const db = await fsOpenDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FS_STORE, 'readwrite');
+    tx.objectStore(FS_STORE).delete(FS_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function fsEnsureDir({ prompt = false } = {}) {
+  if (!window.showDirectoryPicker) throw new Error('Browser missing File System Access API. Use Chrome or Edge.');
+  if (!prompt && fsDirHandle) {
+    const p = await fsDirHandle.queryPermission({ mode: 'readwrite' });
+    if (p === 'granted') return fsDirHandle;
+  }
+  if (!prompt) {
+    const stored = await fsGetStored();
+    if (stored) {
+      const p = await stored.queryPermission({ mode: 'readwrite' });
+      if (p === 'granted') { fsDirHandle = stored; return stored; }
+      const r = await stored.requestPermission({ mode: 'readwrite' });
+      if (r === 'granted') { fsDirHandle = stored; return stored; }
+    }
+  }
+  const handle = await window.showDirectoryPicker({ id: 'radar-state-dir', mode: 'readwrite', startIn: 'documents' });
+  try { await handle.getFileHandle('focus.json'); }
+  catch(e) { throw new Error('Selected folder must contain focus.json. Pick ~/Documents/Radar/state/'); }
+  await fsStore(handle);
+  fsDirHandle = handle;
+  return handle;
+}
+async function fsReadFocus() {
+  const dir = await fsEnsureDir();
+  const fh = await dir.getFileHandle('focus.json');
+  const f = await fh.getFile();
+  return JSON.parse(await f.text());
+}
+async function fsWriteFocus(data) {
+  const dir = await fsEnsureDir();
+  const fh = await dir.getFileHandle('focus.json');
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(data, null, 2));
+  await w.close();
+}
+
+function nowIsoTZ() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(Math.floor(Math.abs(off)/60))}:${pad(Math.abs(off)%60)}`;
+}
+function genFocusId() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `focus-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function isTaskDone(t) {
+  if (!t) return false;
+  if ('active' in t) return t.active === false;
+  return t.completed === true;
+}
+
+// Convert legacy uf-* localStorage shape → focus.json shape
+function legacyToFocus(t) {
+  return {
+    id: t.id && t.id.startsWith('focus-') ? t.id : genFocusId(),
+    title: t.title,
+    added_at: t.added_at || t.created_at || nowIsoTZ(),
+    active: 'active' in t ? t.active : !isTaskDone(t),
+    completed_at: t.completed_at || null
+  };
+}
+
+let toastTimer = null;
+function showToast(msg, kind = 'info') {
+  const el = document.getElementById('radar-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.borderColor = kind === 'error' ? 'var(--danger)' : 'var(--brand-accent)';
+  el.style.opacity = '1';
+  el.style.transform = 'translateY(0)';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+  }, kind === 'error' ? 6000 : 3000);
+}
+
+function setFsStatus() {
+  const status = document.getElementById('fs-status');
+  const btn = document.getElementById('fs-connect-btn');
+  if (!status || !btn) return;
+  if (fsDirHandle) {
+    status.textContent = '✓ synced';
+    status.style.color = 'var(--success)';
+    btn.style.display = 'none';
+  } else {
+    status.textContent = '⚠ local-only';
+    status.style.color = 'var(--warning)';
+    btn.style.display = 'inline-flex';
+  }
+}
+
+// User-facing: triggered by Connect button
+async function connectFocusStorage() {
+  try {
+    await fsEnsureDir({ prompt: true });
+    // Migrate any legacy localStorage tasks into focus.json
+    const cache = loadUserFocusTasks();
+    const focus = await fsReadFocus();
+    focus.tasks = focus.tasks || [];
+    const existingTitles = new Set(focus.tasks.map(t => t.title.trim().toLowerCase()));
+    let migrated = 0;
+    for (const t of (cache.tasks || [])) {
+      const title = (t.title || '').trim();
+      if (!title || existingTitles.has(title.toLowerCase())) continue;
+      focus.tasks.push(legacyToFocus(t));
+      migrated++;
+    }
+    if (migrated > 0) await fsWriteFocus(focus);
+    // Replace cache with focus.json contents (canonical going forward)
+    saveUserFocusTasks({ version: 1, tasks: focus.tasks });
+    setFsStatus();
+    renderUserFocus();
+    updateProgress();
+    updateDoneStrip();
+    showToast(migrated > 0 ? `Connected. Migrated ${migrated} task(s) to focus.json.` : 'Connected to focus.json.');
+  } catch(e) {
+    showToast('Connect failed: ' + e.message, 'error');
+  }
+}
+
 // ----- User focus tasks (press N to add) -----
 
 function loadUserFocusTasks() {
@@ -463,6 +657,27 @@ function loadUserFocusTasks() {
     if (!data.tasks) data.tasks = [];
     return data;
   } catch(e) { return { version: 1, tasks: [] }; }
+}
+function seedCacheFromInitial() {
+  // Merge the server-rendered focus.json (RADAR_FOCUS_JSON_INITIAL) into the localStorage cache.
+  // focus.json is canonical, so its entries win on title collisions.
+  const initial = (RADAR_FOCUS_JSON_INITIAL && RADAR_FOCUS_JSON_INITIAL.tasks) || [];
+  if (initial.length === 0) return;
+  const cache = loadUserFocusTasks();
+  const cacheByTitle = new Map((cache.tasks || []).map(t => [(t.title || '').trim().toLowerCase(), t]));
+  const merged = [];
+  const seenTitles = new Set();
+  for (const t of initial) {
+    const key = (t.title || '').trim().toLowerCase();
+    seenTitles.add(key);
+    merged.push(t);
+  }
+  for (const t of (cache.tasks || [])) {
+    const key = (t.title || '').trim().toLowerCase();
+    if (seenTitles.has(key)) continue;
+    merged.push(t);
+  }
+  saveUserFocusTasks({ version: 1, tasks: merged });
 }
 function saveUserFocusTasks(data) {
   try { localStorage.setItem(USER_FOCUS_KEY, JSON.stringify(data)); } catch(e) {}
@@ -483,40 +698,68 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function addUserFocusTask(title) {
+async function addUserFocusTask(title) {
   title = (title || '').trim();
   if (!title) return;
-  const data = loadUserFocusTasks();
-  data.tasks.push({
-    id: 'uf-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+  const newTask = {
+    id: genFocusId(),
     title,
-    created_at: new Date().toISOString(),
-    created_date: todayISO(),
-    completed: false,
+    added_at: nowIsoTZ(),
+    active: true,
     completed_at: null
-  });
-  saveUserFocusTasks(data);
+  };
+  // Optimistic local cache update for instant UX
+  const cache = loadUserFocusTasks();
+  cache.tasks = cache.tasks || [];
+  cache.tasks.push(newTask);
+  saveUserFocusTasks(cache);
   renderUserFocus();
   updateProgress();
   updateDoneStrip();
+  // Write-through to focus.json
+  try {
+    const focus = await fsReadFocus();
+    focus.tasks = focus.tasks || [];
+    focus.tasks.push(newTask);
+    await fsWriteFocus(focus);
+    showToast('Added to focus.json — visible to /radar-act');
+  } catch(e) {
+    showToast('Saved locally only. Click ⚡ Connect to sync to focus.json.', 'error');
+  }
 }
 
-function toggleUserFocusTask(id, checked) {
-  const data = loadUserFocusTasks();
-  const t = data.tasks.find(x => x.id === id);
+async function toggleUserFocusTask(id, checked) {
+  const cache = loadUserFocusTasks();
+  const t = (cache.tasks || []).find(x => x.id === id);
   if (!t) return;
+  t.active = !checked;
+  t.completed_at = checked ? nowIsoTZ() : null;
+  // legacy field kept for back-compat with any old uf-* entries
   t.completed = checked;
-  t.completed_at = checked ? new Date().toISOString() : null;
-  saveUserFocusTasks(data);
+  saveUserFocusTasks(cache);
+  try {
+    const focus = await fsReadFocus();
+    const ft = (focus.tasks || []).find(x => x.id === id);
+    if (ft) {
+      ft.active = !checked;
+      ft.completed_at = t.completed_at;
+      await fsWriteFocus(focus);
+    }
+  } catch(e) { /* offline — local-only */ }
 }
 
-function deleteUserFocusTask(id) {
-  const data = loadUserFocusTasks();
-  data.tasks = data.tasks.filter(x => x.id !== id);
-  saveUserFocusTasks(data);
+async function deleteUserFocusTask(id) {
+  const cache = loadUserFocusTasks();
+  cache.tasks = (cache.tasks || []).filter(x => x.id !== id);
+  saveUserFocusTasks(cache);
   renderUserFocus();
   updateProgress();
   updateDoneStrip();
+  try {
+    const focus = await fsReadFocus();
+    focus.tasks = (focus.tasks || []).filter(x => x.id !== id);
+    await fsWriteFocus(focus);
+  } catch(e) { /* offline — local-only */ }
 }
 
 function pruneUserFocusTasks() {
@@ -524,7 +767,7 @@ function pruneUserFocusTasks() {
   const today = todayISO();
   const before = data.tasks.length;
   data.tasks = data.tasks.filter(t => {
-    if (!t.completed) return true;
+    if (!isTaskDone(t)) return true;
     if (!t.completed_at) return true;
     return t.completed_at.slice(0, 10) === today;
   });
@@ -537,10 +780,11 @@ function renderUserFocus() {
   if (!list) return;
   const data = loadUserFocusTasks();
   const tasks = data.tasks.slice().sort((a, b) => {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    const dc = (a.created_date || '').localeCompare(b.created_date || '');
-    if (dc !== 0) return dc;
-    return (a.created_at || '').localeCompare(b.created_at || '');
+    const ad = isTaskDone(a), bd = isTaskDone(b);
+    if (ad !== bd) return ad ? 1 : -1;
+    const aAdded = a.added_at || a.created_at || '';
+    const bAdded = b.added_at || b.created_at || '';
+    return aAdded.localeCompare(bAdded);
   });
 
   list.innerHTML = '';
@@ -548,14 +792,15 @@ function renderUserFocus() {
     list.innerHTML = '<div class="user-focus-empty">Press <kbd>N</kbd> to add a focus task — what you <em>choose</em> to work on, not what\'s reacting to notifications.</div>';
   } else {
     tasks.forEach(t => {
-      const days = daysSince(t.created_date);
+      const dayBucket = (t.added_at || t.created_at || '').slice(0, 10);
+      const days = daysSince(dayBucket);
       const badgeClass = days >= 3 ? 'hot' : (days >= 1 ? 'warm' : '');
       const badge = days > 0 ? `<span class="carryover-badge ${badgeClass}">day ${days+1}</span>` : '';
       const item = document.createElement('div');
-      item.className = 'user-focus-item item' + (t.completed ? ' done' : '');
+      item.className = 'user-focus-item item' + (isTaskDone(t) ? ' done' : '');
       item.id = t.id;
       item.innerHTML =
-        '<div class="item-check"><input type="checkbox" data-key="' + t.id + '"' + (t.completed ? ' checked' : '') + ' onchange="handleCheck(this)"></div>' +
+        '<div class="item-check"><input type="checkbox" data-key="' + t.id + '"' + (isTaskDone(t) ? ' checked' : '') + ' onchange="handleCheck(this)"></div>' +
         '<div class="item-body"><div class="item-title">' + escapeHtml(t.title) + badge + '</div></div>' +
         '<button class="user-focus-delete" onclick="deleteUserFocusTask(\'' + t.id + '\')" title="Remove">×</button>';
       list.appendChild(item);
@@ -566,7 +811,7 @@ function renderUserFocus() {
   if (strip) {
     strip.querySelectorAll('.focus-chip.user-added').forEach(c => c.remove());
     const label = strip.querySelector('.focus-label');
-    tasks.filter(t => !t.completed).slice(0, 6).reverse().forEach(t => {
+    tasks.filter(t => !isTaskDone(t)).slice(0, 6).reverse().forEach(t => {
       const chip = document.createElement('span');
       chip.className = 'focus-chip user-added';
       chip.onclick = () => scrollToItem(t.id);
@@ -619,12 +864,34 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+async function tryAutoRestoreFsHandle() {
+  try {
+    const stored = await fsGetStored();
+    if (!stored) return;
+    const p = await stored.queryPermission({ mode: 'readwrite' });
+    if (p === 'granted') {
+      fsDirHandle = stored;
+      // Refresh local cache from disk so we show the latest focus.json
+      try {
+        const focus = await fsReadFocus();
+        saveUserFocusTasks({ version: 1, tasks: focus.tasks || [] });
+        renderUserFocus();
+        updateProgress();
+        updateDoneStrip();
+      } catch(e) { /* ignore */ }
+    }
+  } catch(e) { /* ignore */ }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  restoreState();
+  seedCacheFromInitial();
   renderUserFocus();
+  restoreState();
   updateDoneStrip();
   updateProgress();
   placeNowLine();
+  setFsStatus();
+  tryAutoRestoreFsHandle().then(setFsStatus);
 });
 </script>
 </body>
