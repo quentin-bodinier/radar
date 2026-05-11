@@ -1,7 +1,10 @@
 # Sensitive / generated data
 today.html
 team.html
-state/
+state/*
+# but ship the example templates teammates need to bootstrap
+!state/config.example.json
+!state/commitments.example.json
 
 # Local Claude settings
 .claude/settings.local.json

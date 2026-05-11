@@ -1,0 +1,20 @@
+{
+  "identity": {
+    "name": "Your Name",
+    "role": "Your Role",
+    "company": "Your Company"
+  },
+  "notion": {
+    "enabled": false,
+    "extra_pages": [],
+    "meeting_notes_enabled": false,
+    "meeting_notes_window_days": 7
+  },
+  "gmail": {
+    "exclude_senders": [
+      "noreply",
+      "newsletter",
+      "digest"
+    ]
+  }
+}
