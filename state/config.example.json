@@ -16,5 +16,8 @@
       "newsletter",
       "digest"
     ]
+  },
+  "slack": {
+    "flagged_emoji": ""
   }
 }
