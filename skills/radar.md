@@ -28,6 +28,7 @@ Bind into local vars for the rest of the run:
 - `meeting_notes_enabled = config.notion.meeting_notes_enabled` — boolean (independent of `notion_enabled`; meeting notes only fire if both are true).
 - `meeting_notes_window_days = config.notion.meeting_notes_window_days || 7`.
 - `gmail_exclude_senders = config.gmail.exclude_senders || []` — substrings to filter out of Gmail results.
+- `slack_flagged_emoji = config.slack?.flagged_emoji || null` — when set (e.g. `"eyes"`), `/radar` runs an extra Slack search to surface messages the user reacted to with that emoji, regardless of age. Treat as the user's persistent "deal-with-this" queue.
 
 ### 1. Get the date
 Use the current date from the conversation context. Format the header as e.g. "Thursday, April 23, 2026". Compute ISO date `2026-04-23` for the storage key. Compute "tomorrow" date — skip weekends (Friday → Monday).
@@ -48,9 +49,13 @@ Tools are deferred MCP tools — load via ToolSearch as needed.
 - Tool: `mcp__google-calendar__list_events` (search ToolSearch: "select:mcp__google-calendar__list_events")
 - For each: time, title, attendees, response status (confirmed/tentative/declined), `htmlLink`.
 
-**Slack** — search mentions/DMs needing reply (last 24h).
-- Tool: `mcp__slack__slack_search_public_and_private` or `slack_search_users`
-- Capture `permalink`. Filter out automated digests (Google Calendar daily digest, etc.).
+**Slack** — search mentions/DMs needing reply (last 24h), plus the user's persistent flagged queue.
+- Tool: `mcp__slack__slack_search_public_and_private` (or `slack_search_users`).
+- **Time-window search**: mentions and DMs from the last 24h. Capture `permalink`. Filter out automated digests (Google Calendar daily digest, etc.).
+- **Flagged search** — only if `slack_flagged_emoji` is set. Run a second query `hasmy::EMOJI:` (no time filter) to fetch every message the user has reacted to with that emoji. These are the user's persistent triage queue — they stay until the user removes the reaction.
+  - Dedupe by `permalink` against the time-window results to avoid duplicates.
+  - Tag flagged items so Step 5 can render them with the `🚩` priority marker and sort them to the top of the Slack section.
+  - If the search returns 0 results, that's fine — no separate "no flagged items" empty state needed.
 
 **Gmail** — threads requiring action (last 24h).
 - Tool: `mcp__gmail__search_threads`
@@ -172,20 +177,22 @@ window.RADAR_DATA = {
   ```
   If empty or Notion is disabled: `<div class="empty">No suggestions from recent meeting notes.</div>` (or omit the section entirely from the template if you remove the panel).
 
-- `slackBadge` → e.g. "0 urgent" or "{n} pending"
+- `slackBadge` → e.g. "0 urgent" or "{n} pending". If any items are flagged, prefix with "🚩 {n} flagged · " (e.g. "🚩 2 flagged · 3 pending").
 - `slackItemsHtml` → for each Slack item:
   ```html
-  <div class="item">
-    <div class="item-priority">🔴|🟡|·</div>
+  <div class="item [flagged]">
+    <div class="item-priority">🚩|🔴|🟡|·</div>
     <div class="item-check"><input type="checkbox" data-key="sl-{slug}" onchange="handleCheck(this)"></div>
     <div class="item-body">
       <div class="item-title">{summary of message}</div>
-      <div class="item-sub">{from, channel, when}</div>
+      <div class="item-sub">{from, channel, when}{ · :EMOJI: flagged if applicable}</div>
     </div>
     <a href="{permalink}" target="_blank" class="item-source-link" title="Open in Slack">↗</a>
   </div>
   ```
-  If empty: `<div class="empty">No Slack DMs or mentions needing a reply in the last 24h.</div>`
+  Sort order: flagged items first (priority 🚩), then by urgency (🔴 → 🟡 → ·) within each group. Add the `flagged` class to flagged items so styling can lift them visually. Mention `:{emoji}: flagged` in the sub-line so the user knows why the item is surfacing.
+
+  If empty: `<div class="empty">No Slack DMs, mentions, or flagged messages.</div>`
 
 - `gmailCount` → number of action items
 - `gmailItemsHtml` → same pattern as Slack, with Gmail thread links. If empty: `<div class="empty">No Gmail threads needing action.</div>`

@@ -51,6 +51,7 @@ Optional:
 - `notion.extra_pages` — array of `{label, url}` for any Notion pages you want fetched for meeting-context cross-referencing.
 - `notion.meeting_notes_enabled: true` — surfaces suggested action items from your recent AI meeting notes in a side panel with an "Add to commitments" CTA.
 - `notion.meeting_notes_window_days` — defaults to 7.
+- `slack.flagged_emoji` — a Slack emoji name (no colons, e.g. `"eyes"` or `"bookmark"`). When set, `/radar` runs an extra Slack search for every message you've reacted to with that emoji and surfaces them with a 🚩 marker at the top of the Slack section. Acts as a persistent triage queue — messages stay until you remove the reaction. Pick an emoji you don't already use socially.
 
 ## 4. Create your empty state files
 
