@@ -11,6 +11,7 @@ You are rebuilding the Radar dashboard.
 - **State**:
   - `~/Documents/Radar/state/commitments.json` — **source of truth** for commitments (not a cache). Added/edited via `/radar-commit` and the dashboard checkboxes. `/radar` bumps carryover counters and marks completions, but never creates new commitments.
   - `~/Documents/Radar/state/focus.json` — manually-added focus tasks (read, do not modify).
+  - `~/Documents/Radar/state/slack_flagged.json` — bridge between dashboard checkbox keys for `sl-flagged-*` items and Slack message coordinates `{channel_id, ts, emoji, permalink}`. Rewritten each `/radar` run from the fresh flagged-search results. Used by Step 4 to remove reactions when the user checks off a flagged item.
   - `~/Documents/Radar/state/history/YYYY-MM-DD.json` — write a snapshot of today's commitments + dashboard summary at end of run.
 - **Config**: `~/Documents/Radar/state/config.json` — per-user identity, Notion settings, Gmail filters. Loaded in Step 0.
 
@@ -37,6 +38,7 @@ Use the current date from the conversation context. Format the header as e.g. "T
 - `~/Documents/Radar/state/commitments.json` — **source of truth**. Shape: `[{ id, title, first_seen, last_seen, days_carried, status, priority, due_date, notion_url, added_at, ... }]`. If missing, treat as `[]`.
 - `~/Documents/Radar/state/focus.json`
 - `~/Documents/Radar/state/checked.json` — dashboard-synced checkbox state (written by today.html when the user checks items in the UI). Shape: `{ version, date, updated_at, keys: ["commit-...", "sl-...", ...] }`. If the file is missing or stale (date != today), treat as empty.
+- `~/Documents/Radar/state/slack_flagged.json` — prior-run map of `sl-flagged-*` data-keys to Slack message coordinates. Shape: `{ <data-key>: { channel_id, ts, emoji, permalink, captured_at } }`. Used by Step 4 to remove reactions for checked-off items. If missing, treat as `{}`.
 - `~/Documents/Radar/state/history/` listing — find the most recent prior snapshot (yesterday's, or last weekday's)
 
 If state files don't exist or are corrupted, treat as empty and continue.
@@ -55,6 +57,7 @@ Tools are deferred MCP tools — load via ToolSearch as needed.
 - **Flagged search** — only if `slack_flagged_emoji` is set. Run a second query `hasmy::EMOJI:` (no time filter) to fetch every message the user has reacted to with that emoji. These are the user's persistent triage queue — they stay until the user removes the reaction.
   - Dedupe by `permalink` against the time-window results to avoid duplicates.
   - Tag flagged items so Step 5 can render them with the `🚩` priority marker and sort them to the top of the Slack section.
+  - For each flagged result, capture `channel_id` and message `ts` from the search result so the dashboard checkbox can later trigger reaction removal (see Step 4 reaction-removal flow).
   - If the search returns 0 results, that's fine — no separate "no flagged items" empty state needed.
 
 **Gmail** — threads requiring action (last 24h).
@@ -71,7 +74,7 @@ Tools are deferred MCP tools — load via ToolSearch as needed.
 
 If any source fails (auth expired, etc.), continue with the others and put a small note in that section's empty state. Don't abort the whole run.
 
-### 4. Compute commitment carryover
+### 4. Compute commitment carryover and process dashboard checks
 
 `commitments.json` is the source of truth. Reconcile it with today's date and dashboard-synced completions:
 
@@ -81,6 +84,17 @@ If any source fails (auth expired, etc.), continue with the others and put a sma
 - **Dashboard-synced completions**: for each `commit-*` id in `checked.json.keys` (when `checked.json.date == today`), mark that commitment `status = "completed"`, `completed_at = today`. Exclude it from `commitmentItemsHtml` and from `commitmentsCount`. Include it in `commitments_completed_today` in the history snapshot.
 - **Cleanup**: commitments with `status == "completed"` and `completed_at < today` are dropped from the file (one-day grace already elapsed).
 - **/radar never creates commitments.** New commitments come from `/radar-commit` only.
+
+**Slack flagged-message reaction removal** — when the user checks a `sl-flagged-*` item on the dashboard, the next `/radar` run removes the trigger reaction from the original Slack message so it falls out of the flagged queue permanently. Flow:
+
+1. Before this step, load `~/Documents/Radar/state/slack_flagged.json` if it exists. Shape: `{ <data-key>: { channel_id, ts, emoji, permalink, captured_at } }`. This file is the bridge between dashboard checkbox keys and Slack message coordinates.
+2. From `checked.json.keys` (when `checked.json.date == today`), pick every key matching `sl-flagged-*`.
+3. For each such key, look up its entry in `slack_flagged.json`. If found:
+   - Load `mcp__slack__slack_remove_reaction` via ToolSearch (`select:` form — search for "slack remove_reaction" or similar) and call it with `channel = entry.channel_id`, `name = entry.emoji`, `timestamp = entry.ts`.
+   - On success: delete the entry from `slack_flagged.json` and add the key to the run report's "Flagged reactions removed" list.
+   - On error (already removed, not found, auth): log the error in the run report but don't abort the rest of the run.
+4. After Step 3 in the data-pull phase produces the fresh flagged-search results, **rewrite** `slack_flagged.json` to reflect today's flagged set: `{ <data-key>: { channel_id, ts, emoji, permalink, captured_at: today } }` for every flagged item still present (skipping the ones just removed). Use the same `data-key` convention as Step 5 (`sl-flagged-{slug}` derived from `permalink` or `channel_id + ts` — keep it stable across runs).
+5. The reaction-removal write is a "soft" 2-way action: the dashboard checkbox is the user's explicit consent, so no extra confirmation prompt is needed. But include a one-line summary in the closing report (Step 7): "Removed :{emoji}: reaction from N Slack messages." If N is 0, omit the line.
 
 Use these badges in the rendered HTML (next to the title):
 - `days_carried <= 1`: no badge
@@ -182,7 +196,7 @@ window.RADAR_DATA = {
   ```html
   <div class="item [flagged]">
     <div class="item-priority">🚩|🔴|🟡|·</div>
-    <div class="item-check"><input type="checkbox" data-key="sl-{slug}" onchange="handleCheck(this)"></div>
+    <div class="item-check"><input type="checkbox" data-key="sl-{slug}|sl-flagged-{slug}" onchange="handleCheck(this)"></div>
     <div class="item-body">
       <div class="item-title">{summary of message}</div>
       <div class="item-sub">{from, channel, when}{ · :EMOJI: flagged if applicable}</div>
@@ -190,6 +204,12 @@ window.RADAR_DATA = {
     <a href="{permalink}" target="_blank" class="item-source-link" title="Open in Slack">↗</a>
   </div>
   ```
+  **Data-key convention**:
+  - Non-flagged items: `sl-{slug}` where `{slug}` is derived from message text (first few words slugified).
+  - Flagged items: `sl-flagged-{slug}` where `{slug}` is a stable hash of `{channel_id}:{ts}` (e.g. first 12 chars of SHA-1 of `channel_id + ":" + ts`). Stability across runs matters — the same Slack message must produce the same key so reaction removal can find it in `slack_flagged.json`.
+
+  After rendering, write `state/slack_flagged.json` with `{ "sl-flagged-{slug}": { channel_id, ts, emoji, permalink, captured_at: today } }` for every flagged item rendered this run. This is the lookup table for Step 4's reaction removal on the next run.
+
   Sort order: flagged items first (priority 🚩), then by urgency (🔴 → 🟡 → ·) within each group. Add the `flagged` class to flagged items so styling can lift them visually. Mention `:{emoji}: flagged` in the sub-line so the user knows why the item is surfacing.
 
   If empty: `<div class="empty">No Slack DMs, mentions, or flagged messages.</div>`
@@ -214,7 +234,8 @@ window.RADAR_DATA = {
 In a single batch:
 - Write `~/Documents/Radar/state/data.js` with the `window.RADAR_DATA` object. **Required, every run.**
 - Update `~/Documents/Radar/state/commitments.json` with the reconciled state from step 4. **Required, every run.** Use either `Write` (full overwrite — appropriate when you have full reconciled state) or `Edit` (surgical change — appropriate when you only need to bump `last_seen` / `days_carried` / `status` on existing entries and want to avoid clobbering fields you didn't read). Both are permitted via `Edit(...state/*)` / `Write(...state/*)`.
-- Write today's snapshot to `~/Documents/Radar/state/history/{ISO_DATE}.json` containing: `{date, commitments_open: N, commitments_completed_today: [ids], gmail_count, slack_count, calendar_count, focus_chips: [titles]}`.
+- Write `~/Documents/Radar/state/slack_flagged.json` with the lookup map for this run's flagged items (`{ "sl-flagged-{slug}": {channel_id, ts, emoji, permalink, captured_at} }`). Required whenever `slack_flagged_emoji` is set, even if the map is empty — write `{}` so the next run reads a fresh state. Skip the write entirely when `slack_flagged_emoji` is null.
+- Write today's snapshot to `~/Documents/Radar/state/history/{ISO_DATE}.json` containing: `{date, commitments_open: N, commitments_completed_today: [ids], gmail_count, slack_count, calendar_count, focus_chips: [titles], flagged_reactions_removed: [data_keys]}`.
 
 Do NOT write to `~/Documents/Radar/today.html` — it is a permanent static file.
 Do NOT write to `~/Documents/Radar/state/checked.json` — it is owned by the dashboard (today.html writes it via File System Access API when the user ticks checkboxes). /radar only reads it.
