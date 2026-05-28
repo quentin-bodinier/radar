@@ -8,6 +8,11 @@ state/*
 
 # Local Claude settings
 .claude/settings.local.json
+.claude/worktrees/
+.claude/skills/
+
+# Personal drafts (not part of the shareable Radar)
+proposals/
 
 # macOS
 .DS_Store
