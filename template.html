@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Radar — {{HEADER_DATE}}</title>
+<title id="page-title">Radar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="state/data.js"></script>
 <style>
 :root {
   /* Inato brand — warm neutral dark theme, orange/purple as accents only */
@@ -273,8 +274,8 @@ header {
 <div class="container">
   <header>
     <div class="header-left">
-      <h1>{{HEADER_DATE}}</h1>
-      <div class="meta">{{HEADER_META}}</div>
+      <h1 id="header-date">Radar</h1>
+      <div class="meta" id="header-meta"></div>
     </div>
     <div class="header-right">
       <button id="refresh-btn" onclick="location.reload()">↻ Refresh</button>
@@ -291,7 +292,6 @@ header {
 
   <div class="focus-strip" id="focus-strip">
     <span class="focus-label">Focus →</span>
-    {{FOCUS_CHIPS}}
   </div>
 
   <div class="done-strip" id="done-strip"></div>
@@ -316,19 +316,17 @@ header {
       <div class="card">
         <div class="card-header">
           <div class="card-title">Today's Calendar</div>
-          <div class="badge">{{CALENDAR_COUNT}} events</div>
+          <div class="badge" id="calendar-badge">—</div>
         </div>
-        <div class="timeline" id="timeline">
-          {{CALENDAR_EVENTS}}
-        </div>
+        <div class="timeline" id="timeline"></div>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-title">Open commitments</div>
-          <div class="badge">{{COMMITMENTS_COUNT}} open</div>
+          <div class="badge" id="commitments-badge">—</div>
         </div>
-        {{COMMITMENT_ITEMS}}
+        <div id="commitments-list"></div>
       </div>
 
     </div>
@@ -338,25 +336,25 @@ header {
       <div class="card">
         <div class="card-header">
           <div class="card-title">Slack — awaiting reply</div>
-          <div class="badge">{{SLACK_BADGE}}</div>
+          <div class="badge" id="slack-badge">—</div>
         </div>
-        {{SLACK_ITEMS}}
+        <div id="slack-list"></div>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-title">Gmail — action items</div>
-          <div class="badge">{{GMAIL_COUNT}} open</div>
+          <div class="badge" id="gmail-badge">—</div>
         </div>
-        {{GMAIL_ITEMS}}
+        <div id="gmail-list"></div>
       </div>
 
       <div class="tomorrow-card">
         <div class="card-header">
-          <div class="card-title">Tomorrow — {{TOMORROW_DATE}}</div>
-          <div class="badge">{{TOMORROW_BADGE}}</div>
+          <div class="card-title">Tomorrow — <span id="tomorrow-date"></span></div>
+          <div class="badge" id="tomorrow-badge">—</div>
         </div>
-        {{TOMORROW_ITEMS}}
+        <div id="tomorrow-list"></div>
       </div>
 
     </div>
@@ -372,9 +370,8 @@ header {
 </div>
 
 <script>
-const STORAGE_KEY = 'radar-today-{{ISO_DATE}}';
+const STORAGE_KEY = 'radar-today-' + (window.RADAR_DATA?.isoDate || new Date().toISOString().slice(0,10));
 const USER_FOCUS_KEY = 'radar-user-focus-tasks';
-const RADAR_FOCUS_JSON_INITIAL = {{USER_FOCUS_JSON_INITIAL}};
 const FS_DB_NAME = 'radar-fs';
 const FS_STORE = 'handles';
 const FS_KEY = 'stateDir';
@@ -393,6 +390,7 @@ function handleCheck(el) {
     toggleUserFocusTask(key, el.checked);
     const parent = el.closest('.user-focus-item');
     if (parent) parent.classList.toggle('done', el.checked);
+    renderUserFocus();
     updateDoneStrip();
     updateProgress();
     return;
@@ -404,6 +402,7 @@ function handleCheck(el) {
   if (parent) parent.classList.toggle('done', el.checked);
   updateDoneStrip();
   updateProgress();
+  updateFocusChips();
 }
 
 function restoreState() {
@@ -417,6 +416,7 @@ function restoreState() {
       if (parent) parent.classList.add('done');
     }
   });
+  updateFocusChips();
 }
 
 function scrollToItem(id) {
@@ -427,6 +427,16 @@ function scrollToItem(id) {
     el.style.background = 'var(--surface2)';
     setTimeout(() => { el.style.background = ''; }, 1400);
   }
+}
+
+function updateFocusChips() {
+  document.querySelectorAll('.focus-chip:not(.user-added)').forEach(chip => {
+    const match = (chip.getAttribute('onclick') || '').match(/scrollToItem\('([^']+)'\)/);
+    if (!match) return;
+    const target = document.getElementById(match[1]);
+    if (!target) return;
+    chip.style.display = target.classList.contains('done') ? 'none' : '';
+  });
 }
 
 function updateDoneStrip() {
@@ -658,27 +668,6 @@ function loadUserFocusTasks() {
     return data;
   } catch(e) { return { version: 1, tasks: [] }; }
 }
-function seedCacheFromInitial() {
-  // Merge the server-rendered focus.json (RADAR_FOCUS_JSON_INITIAL) into the localStorage cache.
-  // focus.json is canonical, so its entries win on title collisions.
-  const initial = (RADAR_FOCUS_JSON_INITIAL && RADAR_FOCUS_JSON_INITIAL.tasks) || [];
-  if (initial.length === 0) return;
-  const cache = loadUserFocusTasks();
-  const cacheByTitle = new Map((cache.tasks || []).map(t => [(t.title || '').trim().toLowerCase(), t]));
-  const merged = [];
-  const seenTitles = new Set();
-  for (const t of initial) {
-    const key = (t.title || '').trim().toLowerCase();
-    seenTitles.add(key);
-    merged.push(t);
-  }
-  for (const t of (cache.tasks || [])) {
-    const key = (t.title || '').trim().toLowerCase();
-    if (seenTitles.has(key)) continue;
-    merged.push(t);
-  }
-  saveUserFocusTasks({ version: 1, tasks: merged });
-}
 function saveUserFocusTasks(data) {
   try { localStorage.setItem(USER_FOCUS_KEY, JSON.stringify(data)); } catch(e) {}
 }
@@ -883,8 +872,45 @@ async function tryAutoRestoreFsHandle() {
   } catch(e) { /* ignore */ }
 }
 
+function applyRadarData() {
+  if (!window.RADAR_DATA) return;
+  const d = window.RADAR_DATA;
+  if (d.headerDate) {
+    document.getElementById('page-title').textContent = 'Radar \u2014 ' + d.headerDate;
+    document.getElementById('header-date').textContent = d.headerDate;
+  }
+  if (d.headerMeta) document.getElementById('header-meta').textContent = d.headerMeta;
+  if (d.autoFocusChipsHtml) {
+    const strip = document.getElementById('focus-strip');
+    const label = strip && strip.querySelector('.focus-label');
+    if (label) label.insertAdjacentHTML('afterend', d.autoFocusChipsHtml);
+  }
+  const calBadge = document.getElementById('calendar-badge');
+  if (calBadge && d.calendarCount !== undefined) calBadge.textContent = d.calendarCount + ' events';
+  const timeline = document.getElementById('timeline');
+  if (timeline && d.calendarEventsHtml !== undefined) timeline.innerHTML = d.calendarEventsHtml;
+  const commitBadge = document.getElementById('commitments-badge');
+  if (commitBadge && d.commitmentsCount !== undefined) commitBadge.textContent = d.commitmentsCount + ' open';
+  const commitList = document.getElementById('commitments-list');
+  if (commitList && d.commitmentItemsHtml !== undefined) commitList.innerHTML = d.commitmentItemsHtml;
+  const slackBadge = document.getElementById('slack-badge');
+  if (slackBadge && d.slackBadge !== undefined) slackBadge.textContent = d.slackBadge;
+  const slackList = document.getElementById('slack-list');
+  if (slackList && d.slackItemsHtml !== undefined) slackList.innerHTML = d.slackItemsHtml;
+  const gmailBadge = document.getElementById('gmail-badge');
+  if (gmailBadge && d.gmailCount !== undefined) gmailBadge.textContent = d.gmailCount + ' open';
+  const gmailList = document.getElementById('gmail-list');
+  if (gmailList && d.gmailItemsHtml !== undefined) gmailList.innerHTML = d.gmailItemsHtml;
+  const tomorrowDate = document.getElementById('tomorrow-date');
+  if (tomorrowDate && d.tomorrowDate) tomorrowDate.textContent = d.tomorrowDate;
+  const tomorrowBadge = document.getElementById('tomorrow-badge');
+  if (tomorrowBadge && d.tomorrowBadge) tomorrowBadge.textContent = d.tomorrowBadge;
+  const tomorrowList = document.getElementById('tomorrow-list');
+  if (tomorrowList && d.tomorrowItemsHtml !== undefined) tomorrowList.innerHTML = d.tomorrowItemsHtml;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  seedCacheFromInitial();
+  applyRadarData();
   renderUserFocus();
   restoreState();
   updateDoneStrip();
