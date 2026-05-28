@@ -29,7 +29,7 @@ Bind into local vars for the rest of the run:
 - `meeting_notes_enabled = config.notion.meeting_notes_enabled` — boolean (independent of `notion_enabled`; meeting notes only fire if both are true).
 - `meeting_notes_window_days = config.notion.meeting_notes_window_days || 7`.
 - `gmail_exclude_senders = config.gmail.exclude_senders || []` — substrings to filter out of Gmail results.
-- `slack_flagged_emoji = config.slack?.flagged_emoji || null` — when set (e.g. `"eyes"`), `/radar` runs an extra Slack search to surface messages the user reacted to with that emoji, regardless of age. Treat as the user's persistent "deal-with-this" queue.
+- `slack_flagged_emoji = config.slack?.flagged_emoji || null` — when set (e.g. `"inbox_tray"`), `/radar` runs an extra Slack search to surface messages the user reacted to with that emoji, regardless of age. Treat as the user's persistent "deal-with-this" queue.
 
 ### 1. Get the date
 Use the current date from the conversation context. Format the header as e.g. "Thursday, April 23, 2026". Compute ISO date `2026-04-23` for the storage key. Compute "tomorrow" date — skip weekends (Friday → Monday).
@@ -85,16 +85,17 @@ If any source fails (auth expired, etc.), continue with the others and put a sma
 - **Cleanup**: commitments with `status == "completed"` and `completed_at < today` are dropped from the file (one-day grace already elapsed).
 - **/radar never creates commitments.** New commitments come from `/radar-commit` only.
 
-**Slack flagged-message reaction removal** — when the user checks a `sl-flagged-*` item on the dashboard, the next `/radar` run removes the trigger reaction from the original Slack message so it falls out of the flagged queue permanently. Flow:
+**Slack flagged-message reaction removal** — when the user checks a `sl-flagged-*` item on the dashboard, the next `/radar` run removes the trigger reaction from the original Slack message (so it falls out of the flagged queue permanently) and adds a `:white_check_mark:` reaction to mark it done. Flow:
 
 1. Before this step, load `~/Documents/Radar/state/slack_flagged.json` if it exists. Shape: `{ <data-key>: { channel_id, ts, emoji, permalink, captured_at } }`. This file is the bridge between dashboard checkbox keys and Slack message coordinates.
 2. From `checked.json.keys` (when `checked.json.date == today`), pick every key matching `sl-flagged-*`.
 3. For each such key, look up its entry in `slack_flagged.json`. If found:
    - Load `mcp__slack__slack_remove_reaction` via ToolSearch (`select:` form — search for "slack remove_reaction" or similar) and call it with `channel = entry.channel_id`, `name = entry.emoji`, `timestamp = entry.ts`.
-   - On success: delete the entry from `slack_flagged.json` and add the key to the run report's "Flagged reactions removed" list.
-   - On error (already removed, not found, auth): log the error in the run report but don't abort the rest of the run.
+   - Then load `mcp__slack__slack_add_reaction` via ToolSearch (search "slack add_reaction") and call it with `channel = entry.channel_id`, `name = "white_check_mark"`, `timestamp = entry.ts`. Run this even if the remove call errored with "already removed" — the user checked the box, so the message still deserves the ✅ marker.
+   - On success of either call: delete the entry from `slack_flagged.json` and add the key to the run report's "Flagged reactions removed" list.
+   - On error (already removed/added, not found, auth): log the error in the run report but don't abort the rest of the run. Specifically, an "already_reacted" error on the add call is benign and should be treated as success.
 4. After Step 3 in the data-pull phase produces the fresh flagged-search results, **rewrite** `slack_flagged.json` to reflect today's flagged set: `{ <data-key>: { channel_id, ts, emoji, permalink, captured_at: today } }` for every flagged item still present (skipping the ones just removed). Use the same `data-key` convention as Step 5 (`sl-flagged-{slug}` derived from `permalink` or `channel_id + ts` — keep it stable across runs).
-5. The reaction-removal write is a "soft" 2-way action: the dashboard checkbox is the user's explicit consent, so no extra confirmation prompt is needed. But include a one-line summary in the closing report (Step 7): "Removed :{emoji}: reaction from N Slack messages." If N is 0, omit the line.
+5. The reaction writes are a "soft" 2-way action: the dashboard checkbox is the user's explicit consent, so no extra confirmation prompt is needed. But include a one-line summary in the closing report (Step 7): "Cleared :{emoji}: + added :white_check_mark: on N Slack messages." If N is 0, omit the line.
 
 Use these badges in the rendered HTML (next to the title):
 - `days_carried <= 1`: no badge
