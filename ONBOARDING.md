@@ -51,7 +51,8 @@ Optional:
 - `notion.extra_pages` — array of `{label, url}` for any Notion pages you want fetched for meeting-context cross-referencing.
 - `notion.meeting_notes_enabled: true` — surfaces suggested action items from your recent AI meeting notes in a side panel with an "Add to commitments" CTA.
 - `notion.meeting_notes_window_days` — defaults to 7.
-- `slack.flagged_emoji` — a Slack emoji name (no colons, e.g. `"eyes"` or `"bookmark"`). When set, `/radar` runs an extra Slack search for every message you've reacted to with that emoji and surfaces them with a 🚩 marker at the top of the Slack section. Acts as a persistent triage queue — messages stay until you remove the reaction. Pick an emoji you don't already use socially.
+- `slack.flagged_emoji` — a Slack emoji name (no colons, e.g. `"inbox_tray"` or `"bookmark"`). When set, `/radar` runs an extra Slack search for every message you've reacted to with that emoji and surfaces them with a 🚩 marker at the top of the Slack section. Acts as a persistent triage queue — messages stay until you remove the reaction (or check them off in the dashboard, see below). Pick an emoji you don't already use socially.
+  - **Check-off behavior**: when you tick the checkbox on a flagged Slack item in the dashboard, the next `/radar` run removes the trigger reaction from the original message and adds a `:white_check_mark:` so the thread reads as "done" in Slack. The message drops out of the flagged queue and won't come back unless you re-react with the trigger emoji. The closing report lists how many messages were cleared.
 
 ## 4. Create your empty state files
 
